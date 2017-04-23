@@ -131,8 +131,8 @@ def getCopyFileList(dockerfile_content, github_url):
                         recurseSearchGithub("https://github.com/" + search_link[0], c)
 
 
-test_db = pymysql.connect("112.74.190.220","dockerteam","docker","test", use_unicode=True, charset="utf8")
-dockerteam_db = pymysql.connect("112.74.190.220","dockerteam","docker","dockerteam", use_unicode=True, charset="utf8")
+test_db = pymysql.connect("[ip]","dockerteam","docker","test", use_unicode=True, charset="utf8")
+dockerteam_db = pymysql.connect("[ip]","dockerteam","docker","dockerteam", use_unicode=True, charset="utf8")
 
 test_cursor = test_db.cursor()
 dockerteam_cursor = dockerteam_db.cursor()
