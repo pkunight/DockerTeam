@@ -5,24 +5,27 @@ import uuid
 
 
 class CopyEntity:
-    def __init__(self, command, file_content):
+    def __init__(self, command, url, content):
         self.command = command
-        self.file_content = file_content
+        self.url = url
+        self.content = content
 
 p_name = re.compile(r".+/(.+?)/(.+?)/")
 
-p_github_url = re.compile(r"github.com/(.+?)\"")
+p_github_url = re.compile(r"<a href=\"https://github.com/(.+?)\"")
 
 p_dockerfile_div = re.compile(r"<div class=\"hljs\".+?>([\s\S]+?)</div>")
-p_dockerfile_content = re.compile(r"<span.+?>|</span>")
+p_file_content = re.compile(r"<span.+?>|</span>")
 
 run_command_pattern = re.compile(r"RUN[\S\s]+?[^\\]\n")
 copy_command_pattern = re.compile(r"COPY[\s\S]+?\n|ADD[\s\S]+?\n")
 copy_filename_pattern = re.compile(r"(COPY|ADD)\s(.+?)\s(.+?)\n")
 
-file_table_pattern = re.compile(r"<table class=\"highlight.+?>([\s\S]+?)</table>")
+file_table_pattern = re.compile(r"<table class=\".+?js-file-line-container.+?>([\s\S]+?)</table>")
 files_table_list_pattern = re.compile(r"<table class=\"files.+?>([\s\S]+?)</table>")
-a_link_pattern = re.compile(r"<a href=\"(.+)\"")
+a_link_pattern = re.compile(r"<td class=\"content\">[\s\S]*?<span.+?>[\s\S]*?<a href=\"(.+?)\"")
+file_content_pattern = re.compile(r"<td id=\"LC.+?>([\s\S]+?)</td>")
+
 
 def getName(html_url):
     name = p_name.findall(html_url)
@@ -30,6 +33,7 @@ def getName(html_url):
         return name[0][0] + "/" + name[0][1]
     else:
         return ""
+
 
 def getDockerfileFromHtml(html_url):
     _url = html_url+"~/dockerfile/"
@@ -45,7 +49,7 @@ def getDockerfileFromHtml(html_url):
     res_div = p_dockerfile_div.findall(req.text, re.M)
 
     if len(res_div) > 0:
-        res_content = re.subn(p_dockerfile_content, "", res_div[0])
+        res_content = re.subn(p_file_content, "", res_div[0])
         res_content = res_content[0].replace("\"","\\\"")
         if len(res_content) == 0:
             res_content = ""
@@ -54,41 +58,53 @@ def getDockerfileFromHtml(html_url):
 
     return res_content, res_github_url
 
+
 def getRunCommandList(dockerfile_content):
     run_command_list = run_command_pattern.findall(dockerfile_content)
     #print("run_command_list:", run_command_list)
     return run_command_list
 
+g_f_c_list = []
+
+
 def recurseSearchGithub(github_url_with_filename, c):
-    list = []
+    global g_f_c_list
     req = requests.get(url=github_url_with_filename)
     files_list = files_table_list_pattern.findall(req.text)
     file_table = file_table_pattern.findall(req.text)
+    #print("files_list:", files_list)
+    #print("file_table:", file_table)
     if len(files_list) > 0:
-        print("files list")
-        a_link_list = a_link_pattern.findall(files_list[0][0])
+        #print("files list")
+        a_link_list = a_link_pattern.findall(files_list[0])
         for a_link in a_link_list:
-            recurseSearchGithub(a_link, c)
+            a_link = "https://github.com"+a_link
+            if a_link != github_url_with_filename:
+                recurseSearchGithub(a_link, c)
     elif len(file_table) > 0:
-        print("file table")
-        copy_file_content_entity = CopyEntity(c, "")
-
+        #print("file table")
+        copy_file_content_entity = CopyEntity(c.rstrip('\n'), github_url_with_filename ,"")
+        file_content_list = file_content_pattern.findall(file_table[0])
+        file_content = ""
+        for f_c in file_content_list:
+            file_content += f_c + "\n"
+        copy_file_content_entity.content = re.subn(p_file_content, "", file_content)
+        g_f_c_list.append(copy_file_content_entity)
     else:
-        print("No github content")
+        print("No github content, url=", github_url_with_filename)
 
-    return list
 
 def getCopyFileList(dockerfile_content, github_url):
+    global g_f_c_list
     _url = "https://github.com/" + github_url
     copy_list = copy_command_pattern.findall(dockerfile_content, re.M)
     #print("copy_list:", copy_list)
-    copy_file_content_list = []
     for c in copy_list:
         filename = copy_filename_pattern.findall(c)
         #print("filename:", filename)
         from_filename = filename[0][1]
-        to_filename = filename[0][2]
-        #print(from_filename, to_filename)
+        from_filename = from_filename.rstrip('/')
+        #print("from_filename:", from_filename)
 
         if from_filename == ".":
             #直接递归搜索该github链接下的所有文件即可
@@ -96,23 +112,29 @@ def getCopyFileList(dockerfile_content, github_url):
         else:
             #先获取需要的文件/文件夹的url,再进入递归搜索过程
             req = requests.get(url=_url)
-            a_link_list = a_link_pattern.findall(req.text)
-            search_link_pattern = re.compile(r"https://github.com"+github_url+".*"+from_filename)
-            for a_link in a_link_list[0]:
-                search_link = search_link_pattern.findall(a_link_list)[0][0]
+            #print("github_url:", github_url, "_url:", _url)
+            files_list = files_table_list_pattern.findall(req.text)
+            #print("files_list:", files_list[0])
+            a_link_list = a_link_pattern.findall(files_list[0])
+            #print("a_link_list:", a_link_list)
+            search_link_pattern = re.compile(r"/"+github_url+"/.+?/.+?/"+from_filename+"$")
+            for a_link in a_link_list:
+                #print("a_link:", a_link)
+                search_link = search_link_pattern.findall(a_link)
+                #print("search_link:", search_link)
                 if len(search_link) > 0:
-                    recurseSearchGithub(search_link, c)
-
-    return copy_list, copy_file_content_list
+                    recurseSearchGithub("https://github.com/" + search_link[0], c)
 
 
-test_db = pymysql.connect("[ip]","dockerteam","docker","test")
-dockerteam_db = pymysql.connect("[ip]","dockerteam","docker","dockerteam")
+test_db = pymysql.connect("112.74.190.220","dockerteam","docker","test")
+dockerteam_db = pymysql.connect("112.74.190.220","dockerteam","docker","dockerteam")
 
 test_cursor = test_db.cursor()
 dockerteam_cursor = dockerteam_db.cursor()
 
-test_cursor.execute("SELECT url from test.images where id = 403964 limit 0,-1")
+#403964
+#285257
+test_cursor.execute("SELECT url from test.images where id = 403964")
 count = 0
 for row in test_cursor.fetchall():
     count = count + 1
@@ -129,22 +151,30 @@ for row in test_cursor.fetchall():
         dockerfile_uuid = uuid.uuid1()
         try:
             #Insert dockerfile content
+            effect_row = 1
             effect_row = dockerteam_cursor.execute("INSERT INTO dockerfile(uuid, dockerhub_url, dockerfile_name, github_url, dockerfile_content) VALUES(\"%s\", \" %s\", \" %s\", \" %s\", \"%s\")" % (dockerfile_uuid, dockerhub_url, dockerfile_name, github_url, dockerfile_content))
             if effect_row > 0:
                 print("Insert dockerfile into database")
 
                 # Insert run command
                 run_command_list = getRunCommandList(dockerfile_content)
-                for run_command_content in run_command_list:
-                    effect_row = dockerteam_cursor.execute("INSERT INTO run_command(dockerfile_uuid, run_command) VALUES(\"%s\", \"%s\")" % (dockerfile_uuid, run_command_content))
+                for r_c in run_command_list:
+                    #print("run_command")
+                    effect_row2 = dockerteam_cursor.execute("INSERT INTO run_command(dockerfile_uuid, run_command) VALUES(\"%s\", \"%s\")" % (dockerfile_uuid, r_c))
 
                 # Insert copy file content
-                copy_file_content_list = getCopyFileList(dockerfile_content, github_url)
+                g_f_c_list = []
+                getCopyFileList(dockerfile_content, github_url)
+                for f_c_e in g_f_c_list:
+                    #print(f_c_e.command)
+                    #print(f_c_e.url)
+                    #print(f_c_e.content)
+                    effect_row3 = dockerteam_cursor.execute("INSERT INTO githubfile(dockerfile_uuid, copy_command, url, file_content) VALUES(\"%s\", \"%s\", \"%s\", \"%s\")" % (dockerfile_uuid, f_c_e.command, f_c_e.url, f_c_e.content))
 
                 dockerteam_db.commit()
             else:
                 print("Insert fail without exception")
-        except Exception as e:
+        except pymysql.InternalError as e:
             print("Exception:", e)
     else:
         print("no dockerfile content, ignore")
