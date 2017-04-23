@@ -49,8 +49,8 @@ def getDockerfileFromHtml(html_url):
     res_div = p_dockerfile_div.findall(req.text, re.M)
 
     if len(res_div) > 0:
-        res_content = re.subn(p_file_content, "", res_div[0])
-        res_content = res_content[0].replace("\"","\\\"")
+        res_content = re.sub(p_file_content, "", res_div[0])
+        res_content = res_content.replace("\"","\\\"")
         if len(res_content) == 0:
             res_content = ""
     else:
@@ -88,7 +88,7 @@ def recurseSearchGithub(github_url_with_filename, c):
         file_content = ""
         for f_c in file_content_list:
             file_content += f_c + "\n"
-        copy_file_content_entity.content = re.subn(p_file_content, "", file_content)
+        copy_file_content_entity.content = re.sub(p_file_content, "", file_content)
         g_f_c_list.append(copy_file_content_entity)
     else:
         print("No github content, url=", github_url_with_filename)
@@ -134,7 +134,7 @@ dockerteam_cursor = dockerteam_db.cursor()
 
 #403964
 #285257
-test_cursor.execute("SELECT url from test.images where id = 403964")
+test_cursor.execute("SELECT url from test.images limit 0,100000")
 count = 0
 for row in test_cursor.fetchall():
     count = count + 1
@@ -147,15 +147,15 @@ for row in test_cursor.fetchall():
     #print(dockerfile_content)
     #print(github_url)
 
-    if dockerfile_content != "":
+    if len(dockerfile_content) > 0:
         dockerfile_uuid = uuid.uuid1()
         try:
             #Insert dockerfile content
-            effect_row = 1
+            #effect_row = 1
             effect_row = dockerteam_cursor.execute("INSERT INTO dockerfile(uuid, dockerhub_url, dockerfile_name, github_url, dockerfile_content) VALUES(\"%s\", \" %s\", \" %s\", \" %s\", \"%s\")" % (dockerfile_uuid, dockerhub_url, dockerfile_name, github_url, dockerfile_content))
             if effect_row > 0:
                 print("Insert dockerfile into database")
-
+                print("dockerfile_content:",dockerfile_content)
                 # Insert run command
                 run_command_list = getRunCommandList(dockerfile_content)
                 for r_c in run_command_list:
