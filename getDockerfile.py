@@ -69,29 +69,32 @@ g_f_c_list = []
 
 def recurseSearchGithub(github_url_with_filename, c):
     global g_f_c_list
-    req = requests.get(url=github_url_with_filename)
-    files_list = files_table_list_pattern.findall(req.text)
-    file_table = file_table_pattern.findall(req.text)
-    #print("files_list:", files_list)
-    #print("file_table:", file_table)
-    if len(files_list) > 0:
-        #print("files list")
-        a_link_list = a_link_pattern.findall(files_list[0])
-        for a_link in a_link_list:
-            a_link = "https://github.com"+a_link
-            if a_link != github_url_with_filename:
-                recurseSearchGithub(a_link, c)
-    elif len(file_table) > 0:
-        #print("file table")
-        copy_file_content_entity = CopyEntity(c.rstrip('\n'), github_url_with_filename ,"")
-        file_content_list = file_content_pattern.findall(file_table[0])
-        file_content = ""
-        for f_c in file_content_list:
-            file_content += f_c + "\n"
-        copy_file_content_entity.content = re.sub(p_file_content, "", file_content)
-        g_f_c_list.append(copy_file_content_entity)
-    else:
-        print("No github content, url=", github_url_with_filename)
+    try:
+        req = requests.get(url=github_url_with_filename)
+        files_list = files_table_list_pattern.findall(req.text)
+        file_table = file_table_pattern.findall(req.text)
+        # print("files_list:", files_list)
+        # print("file_table:", file_table)
+        if len(files_list) > 0:
+            # print("files list")
+            a_link_list = a_link_pattern.findall(files_list[0])
+            for a_link in a_link_list:
+                a_link = "https://github.com" + a_link
+                if a_link != github_url_with_filename:
+                    recurseSearchGithub(a_link, c)
+        elif len(file_table) > 0:
+            # print("file table")
+            copy_file_content_entity = CopyEntity(c.rstrip('\n'), github_url_with_filename, "")
+            file_content_list = file_content_pattern.findall(file_table[0])
+            file_content = ""
+            for f_c in file_content_list:
+                file_content += f_c + "\n"
+            copy_file_content_entity.content = re.sub(p_file_content, "", file_content)
+            g_f_c_list.append(copy_file_content_entity)
+        else:
+            print("No github content, url=", github_url_with_filename)
+    except Exception as e:
+        print("Exception:", e)
 
 
 def getCopyFileList(dockerfile_content, github_url):
@@ -128,8 +131,8 @@ def getCopyFileList(dockerfile_content, github_url):
                         recurseSearchGithub("https://github.com/" + search_link[0], c)
 
 
-test_db = pymysql.connect("[ip]","dockerteam","docker","test", use_unicode=True, charset="utf8")
-dockerteam_db = pymysql.connect("[ip]","dockerteam","docker","dockerteam", use_unicode=True, charset="utf8")
+test_db = pymysql.connect("112.74.190.220","dockerteam","docker","test", use_unicode=True, charset="utf8")
+dockerteam_db = pymysql.connect("112.74.190.220","dockerteam","docker","dockerteam", use_unicode=True, charset="utf8")
 
 test_cursor = test_db.cursor()
 dockerteam_cursor = dockerteam_db.cursor()
