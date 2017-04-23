@@ -126,8 +126,8 @@ def getCopyFileList(dockerfile_content, github_url):
                     recurseSearchGithub("https://github.com/" + search_link[0], c)
 
 
-test_db = pymysql.connect("[ip]","dockerteam","docker","test")
-dockerteam_db = pymysql.connect("[ip]","dockerteam","docker","dockerteam")
+test_db = pymysql.connect("[ip]","dockerteam","docker","test", use_unicode=True, charset="utf8")
+dockerteam_db = pymysql.connect("[ip]","dockerteam","docker","dockerteam", use_unicode=True, charset="utf8")
 
 test_cursor = test_db.cursor()
 dockerteam_cursor = dockerteam_db.cursor()
@@ -155,7 +155,7 @@ for row in test_cursor.fetchall():
             effect_row = dockerteam_cursor.execute("INSERT INTO dockerfile(uuid, dockerhub_url, dockerfile_name, github_url, dockerfile_content) VALUES(\"%s\", \" %s\", \" %s\", \" %s\", \"%s\")" % (dockerfile_uuid, dockerhub_url, dockerfile_name, github_url, dockerfile_content))
             if effect_row > 0:
                 print("Insert dockerfile into database")
-                print("dockerfile_content:",dockerfile_content)
+                #print("dockerfile_content:",dockerfile_content)
                 # Insert run command
                 run_command_list = getRunCommandList(dockerfile_content)
                 for r_c in run_command_list:
