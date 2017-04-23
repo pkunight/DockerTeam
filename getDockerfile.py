@@ -101,10 +101,11 @@ def getCopyFileList(dockerfile_content, github_url):
     #print("copy_list:", copy_list)
     for c in copy_list:
         filename = copy_filename_pattern.findall(c)
-        #print("filename:", filename)
-        from_filename = filename[0][1]
-        from_filename = from_filename.rstrip('/')
-        #print("from_filename:", from_filename)
+        if len(filename) > 0:
+            # print("filename:", filename)
+            from_filename = filename[0][1]
+            from_filename = from_filename.rstrip('/')
+            # print("from_filename:", from_filename)
 
         if from_filename == ".":
             #直接递归搜索该github链接下的所有文件即可
@@ -114,16 +115,17 @@ def getCopyFileList(dockerfile_content, github_url):
             req = requests.get(url=_url)
             #print("github_url:", github_url, "_url:", _url)
             files_list = files_table_list_pattern.findall(req.text)
-            #print("files_list:", files_list[0])
-            a_link_list = a_link_pattern.findall(files_list[0])
-            #print("a_link_list:", a_link_list)
-            search_link_pattern = re.compile(r"/"+github_url+"/.+?/.+?/"+from_filename+"$")
-            for a_link in a_link_list:
-                #print("a_link:", a_link)
-                search_link = search_link_pattern.findall(a_link)
-                #print("search_link:", search_link)
-                if len(search_link) > 0:
-                    recurseSearchGithub("https://github.com/" + search_link[0], c)
+            if len(files_list) > 0:
+                # print("files_list:", files_list[0])
+                a_link_list = a_link_pattern.findall(files_list[0])
+                # print("a_link_list:", a_link_list)
+                search_link_pattern = re.compile(r"/" + github_url + "/.+?/.+?/" + from_filename + "$")
+                for a_link in a_link_list:
+                    # print("a_link:", a_link)
+                    search_link = search_link_pattern.findall(a_link)
+                    # print("search_link:", search_link)
+                    if len(search_link) > 0:
+                        recurseSearchGithub("https://github.com/" + search_link[0], c)
 
 
 test_db = pymysql.connect("[ip]","dockerteam","docker","test", use_unicode=True, charset="utf8")
