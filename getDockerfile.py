@@ -70,6 +70,7 @@ g_f_c_list = []
 def recurseSearchGithub(github_url_with_filename, c):
     global g_f_c_list
     try:
+        #print("recurseSearchGithub url:", github_url_with_filename)
         req = requests.get(url=github_url_with_filename)
         files_list = files_table_list_pattern.findall(req.text)
         file_table = file_table_pattern.findall(req.text)
@@ -94,7 +95,7 @@ def recurseSearchGithub(github_url_with_filename, c):
         else:
             print("No github content, url=", github_url_with_filename)
     except Exception as e:
-        print("Exception:", e)
+        print("recurseSearchGithub Exception:", e, "url=", github_url_with_filename)
 
 
 def getCopyFileList(dockerfile_content, github_url):
@@ -114,21 +115,24 @@ def getCopyFileList(dockerfile_content, github_url):
             #直接递归搜索该github链接下的所有文件即可
             recurseSearchGithub(_url, c)
         else:
-            #先获取需要的文件/文件夹的url,再进入递归搜索过程
-            req = requests.get(url=_url)
-            #print("github_url:", github_url, "_url:", _url)
-            files_list = files_table_list_pattern.findall(req.text)
-            if len(files_list) > 0:
-                # print("files_list:", files_list[0])
-                a_link_list = a_link_pattern.findall(files_list[0])
-                # print("a_link_list:", a_link_list)
-                search_link_pattern = re.compile(r"/" + github_url + "/.+?/.+?/" + from_filename + "$")
-                for a_link in a_link_list:
-                    # print("a_link:", a_link)
-                    search_link = search_link_pattern.findall(a_link)
-                    # print("search_link:", search_link)
-                    if len(search_link) > 0:
-                        recurseSearchGithub("https://github.com/" + search_link[0], c)
+            try:
+                # 先获取需要的文件/文件夹的url,再进入递归搜索过程
+                req = requests.get(url=_url)
+                # print("github_url:", github_url, "_url:", _url)
+                files_list = files_table_list_pattern.findall(req.text)
+                if len(files_list) > 0:
+                    # print("files_list:", files_list[0])
+                    a_link_list = a_link_pattern.findall(files_list[0])
+                    # print("a_link_list:", a_link_list)
+                    search_link_pattern = re.compile(r"/" + github_url + "/.+?/.+?/" + from_filename + "$")
+                    for a_link in a_link_list:
+                        # print("a_link:", a_link)
+                        search_link = search_link_pattern.findall(a_link)
+                        # print("search_link:", search_link)
+                        if len(search_link) > 0:
+                            recurseSearchGithub("https://github.com/" + search_link[0], c)
+            except Exception as e:
+                print("getCopyFileList Exception:", e, "url=", _url)
 
 
 test_db = pymysql.connect("[ip]","dockerteam","docker","test", use_unicode=True, charset="utf8")
@@ -139,8 +143,8 @@ dockerteam_cursor = dockerteam_db.cursor()
 
 #403964
 #285257
-test_cursor.execute("SELECT url from test.images limit 0,100000")
-count = 0
+count = 55
+test_cursor.execute("SELECT url from test.images limit "+count+",100000")
 for row in test_cursor.fetchall():
     count = count + 1
     print(count)
