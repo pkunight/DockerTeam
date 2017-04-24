@@ -134,9 +134,9 @@ def getCopyFileList(dockerfile_content, github_url):
             except Exception as e:
                 print("getCopyFileList Exception:", e, "url=", _url)
 
-
-test_db = pymysql.connect("[ip]","dockerteam","docker","test", use_unicode=True, charset="utf8")
-dockerteam_db = pymysql.connect("[ip]","dockerteam","docker","dockerteam", use_unicode=True, charset="utf8")
+db_ip = ""
+test_db = pymysql.connect(db_ip,"dockerteam","docker","test", use_unicode=True, charset="utf8")
+dockerteam_db = pymysql.connect(db_ip,"dockerteam","docker","dockerteam", use_unicode=True, charset="utf8")
 
 test_cursor = test_db.cursor()
 dockerteam_cursor = dockerteam_db.cursor()
@@ -144,7 +144,7 @@ dockerteam_cursor = dockerteam_db.cursor()
 #403964
 #285257
 count = 55
-test_cursor.execute("SELECT url from test.images limit "+count+",100000")
+test_cursor.execute("SELECT url from test.images limit "+str(count)+",100000")
 for row in test_cursor.fetchall():
     count = count + 1
     print(count)
@@ -184,6 +184,8 @@ for row in test_cursor.fetchall():
             else:
                 print("Insert fail without exception")
         except pymysql.InternalError as e:
+            print("pymysql.InternalError Exception:", e)
+        except Exception as e:
             print("Exception:", e)
     else:
         print("no dockerfile content, ignore")
