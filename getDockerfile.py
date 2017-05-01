@@ -38,6 +38,7 @@ def getName(html_url):
 def getDockerfileFromHtml(html_url):
     _url = html_url+"~/dockerfile/"
     #print(_url)
+
     req = requests.get(url=_url)
 
     res_github_url = p_github_url.findall(req.text)
@@ -50,6 +51,7 @@ def getDockerfileFromHtml(html_url):
 
     if len(res_div) > 0:
         res_content = re.sub(p_file_content, "", res_div[0])
+        res_content = res_content.replace("\\", "\\\\")
         res_content = res_content.replace("\"","\\\"")
         if len(res_content) == 0:
             res_content = ""
@@ -134,17 +136,14 @@ def getCopyFileList(dockerfile_content, github_url):
             except Exception as e:
                 print("getCopyFileList Exception:", e, "url=", _url)
 
-db_ip = ""
+db_ip = "[ip]"
+
 test_db = pymysql.connect(db_ip,"dockerteam","docker","test", use_unicode=True, charset="utf8")
-dockerteam_db = pymysql.connect(db_ip,"dockerteam","docker","dockerteam", use_unicode=True, charset="utf8")
-
 test_cursor = test_db.cursor()
-dockerteam_cursor = dockerteam_db.cursor()
 
-#403964
-#285257
-count = 55
-test_cursor.execute("SELECT url from test.images limit "+str(count)+",100000")
+count = 157940
+test_cursor.execute("SELECT url from test.images limit "+str(count)+",200000")
+
 for row in test_cursor.fetchall():
     count = count + 1
     print(count)
@@ -156,40 +155,56 @@ for row in test_cursor.fetchall():
     #print(dockerfile_content)
     #print(github_url)
 
+    #每隔一定次数重连一次数据库
+    reconnect_count = 0
     if len(dockerfile_content) > 0:
         dockerfile_uuid = uuid.uuid1()
         try:
+            if reconnect_count == 0:
+                dockerteam_db = pymysql.connect(db_ip, "dockerteam", "docker", "dockerteam", use_unicode=True,
+                                            charset="utf8")
+                dockerteam_cursor = dockerteam_db.cursor()
+                reconnect_count += 1
+
             #Insert dockerfile content
-            #effect_row = 1
-            effect_row = dockerteam_cursor.execute("INSERT INTO dockerfile(uuid, dockerhub_url, dockerfile_name, github_url, dockerfile_content) VALUES(\"%s\", \" %s\", \" %s\", \" %s\", \"%s\")" % (dockerfile_uuid, dockerhub_url, dockerfile_name, github_url, dockerfile_content))
-            if effect_row > 0:
-                print("Insert dockerfile into database")
-                #print("dockerfile_content:",dockerfile_content)
-                # Insert run command
-                run_command_list = getRunCommandList(dockerfile_content)
-                for r_c in run_command_list:
-                    #print("run_command")
-                    effect_row2 = dockerteam_cursor.execute("INSERT INTO run_command(dockerfile_uuid, run_command) VALUES(\"%s\", \"%s\")" % (dockerfile_uuid, r_c))
+            sql = "INSERT INTO dockerfile(uuid, dockerhub_url, dockerfile_name, github_url, dockerfile_content) VALUES(\"%s\", \" %s\", \" %s\", \" %s\", \"%s\")" % (dockerfile_uuid, dockerhub_url, dockerfile_name, github_url, dockerfile_content)
+            effect_row = dockerteam_cursor.execute(sql)
 
-                # Insert copy file content
-                g_f_c_list = []
-                getCopyFileList(dockerfile_content, github_url)
-                for f_c_e in g_f_c_list:
-                    #print(f_c_e.command)
-                    #print(f_c_e.url)
-                    #print(f_c_e.content)
-                    effect_row3 = dockerteam_cursor.execute("INSERT INTO githubfile(dockerfile_uuid, copy_command, url, file_content) VALUES(\"%s\", \"%s\", \"%s\", \"%s\")" % (dockerfile_uuid, f_c_e.command, f_c_e.url, f_c_e.content))
+            dockerteam_db.commit()
 
-                dockerteam_db.commit()
-            else:
-                print("Insert fail without exception")
+            if reconnect_count == 10:
+                dockerteam_db.close()
+                reconnect_count = 0
+
+            # if effect_row > 0:
+            #     print("Inserted dockerfile into database")
+            #     #print("dockerfile_content:",dockerfile_content)
+            #     # Insert run command
+            #     run_command_list = getRunCommandList(dockerfile_content)
+            #     for r_c in run_command_list:
+            #         sql = "INSERT INTO run_command(dockerfile_uuid, run_command) VALUES(\"%s\", \"%s\")" % (dockerfile_uuid, r_c)
+            #         effect_row2 = dockerteam_cursor.execute(sql)
+            #
+            #     # Insert copy file content
+            #     g_f_c_list = []
+            #     getCopyFileList(dockerfile_content, github_url)
+            #     for f_c_e in g_f_c_list:
+            #         #print(f_c_e.command)
+            #         #print(f_c_e.url)
+            #         #print(f_c_e.content)
+            #         sql = "INSERT INTO githubfile(dockerfile_uuid, copy_command, url, file_content) VALUES(\"%s\", \"%s\", \"%s\", \"%s\")" % (dockerfile_uuid, f_c_e.command, f_c_e.url, f_c_e.content)
+            #         effect_row3 = dockerteam_cursor.execute(sql)
+            #     dockerteam_db.commit()
+            #     dockerteam_db.close()
+
         except pymysql.InternalError as e:
             print("pymysql.InternalError Exception:", e)
+            dockerteam_db.close()
         except Exception as e:
             print("Exception:", e)
+            dockerteam_db.close()
     else:
         print("no dockerfile content, ignore")
 
 test_db.close()
-dockerteam_db.commit()
 dockerteam_db.close()
