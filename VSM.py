@@ -1,6 +1,7 @@
 import re
 import csv
 import math
+import numpy
 import sklearn.cluster
 import scipy.sparse
 import scipy.sparse.linalg
@@ -26,7 +27,7 @@ dockerfile_id_list = []
 dockerfile_name_list = []
 dockerfile_content_list = []
 
-word_pattern = re.compile(r"(\S+?)\s")
+word_pattern = re.compile(r"\S+")
 
 with open('dockerfile.csv', newline='') as csvfile:
     spamreader = csv.reader(line for line in csvfile)
@@ -74,34 +75,59 @@ for word in word_count:
     #if word_count[word] > 1:
     word_bag[word] = count
     count += 1
-    word_idf[word] = math.log(dockerfile_count / (word_dockerfile_count[word] + 1.0))
-
-#计算词的idf值
-
+    word_idf[word] = math.log(dockerfile_count / float(word_dockerfile_count[word] + 1))
 
 print("build word bag finish")
 
 dockerfile_word_lil_matrix = scipy.sparse.lil_matrix((dockerfile_count, len(word_bag)), dtype='float')
 
+#存储dockerfile向量模长, 用于余弦相似度计算
+vector_len = []
 count = 0
 for d_w_c in total_dockerfile_word_list:
+    v_len = 0.0
     for word in d_w_c:
-        if word in word_bag:
-            dockerfile_word_lil_matrix[count, word_bag[word]] = (d_w_c[word]/total_dockerfile_word_count[count])*word_idf[word]
+        #if word in word_bag:
+        w_tf_idf = (d_w_c[word]/total_dockerfile_word_count[count])*word_idf[word]
+        v_len += w_tf_idf * w_tf_idf
+        dockerfile_word_lil_matrix[count, word_bag[word]] = w_tf_idf
+    v_len = math.sqrt(v_len)
+    vector_len.append(v_len)
     count += 1
 
 dockerfile_word_csr_matrix = dockerfile_word_lil_matrix.tocsr()
 print("build dockerfile-word lil_matrix finish")
 
-res = sklearn.cluster.DBSCAN(eps=0.3, min_samples=2).fit(dockerfile_word_csr_matrix)
-#res = sklearn.cluster.KMeans(n_clusters=500).fit(dockerfile_word_csr_matrix)
+# ----------------------------------------------------------------------------------------
+# similarity_matrix = dockerfile_word_csr_matrix.dot(dockerfile_word_lil_matrix.transpose().tocsr())
+# similarity_matrix = similarity_matrix.toarray()
+# print("calculate matrix multiply finish")
+#
+# for i in range(dockerfile_count):
+#     for j in range(dockerfile_count):
+#         if i < j:
+#             similarity_matrix[i, j] = 0
+#         else:
+#             similarity_matrix[i, j] = similarity_matrix[i, j] / (vector_len[i]*vector_len[j])
+#
+# with open('similarity_matrix.csv', 'w', newline='') as csvfile_s_m:
+#     spamwriter = csv.writer(csvfile_s_m)
+#     for i in range(dockerfile_count):
+#         row_list = []
+#         for j in range(i+1):
+#             row_list.append(similarity_matrix[i, j])
+#         spamwriter.writerow(row_list)
+# print("write similarity matrix into csv file finish")
+#------------------------------------------------------------------------------------------
 
-print("cluster finish")
+res = sklearn.cluster.DBSCAN(eps=0.5, min_samples=2).fit(dockerfile_word_csr_matrix)
+
+print("DBSCAN cluster finish")
 
 # 返回的res.labels_是一个打完label的数组, 编号为0, 1, ... , x (离群太远的噪声点标为-1)
 #print(res.labels_)
 
-with open('result.csv', 'w', newline='') as csvfile_res:
+with open('result_eps_0.5.csv', 'w', newline='') as csvfile_res:
     spamwriter = csv.writer(csvfile_res)
     for i in range(dockerfile_count):
         spamwriter.writerow([dockerfile_id_list[i], dockerfile_name_list[i], res.labels_[i], dockerfile_content_list[i]])
