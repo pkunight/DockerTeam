@@ -1,6 +1,7 @@
 import pymysql
 import csv
 import re
+import codecs
 
 maintainer_pattern = re.compile(r"(MAINTAINER|#)[^\n]*?\n")
 
@@ -12,6 +13,7 @@ dockerteam_cursor = dockerteam_db.cursor()
 dockerteam_cursor.execute("SELECT id, dockerfile_name, dockerfile_content from dockerteam.dockerfile")
 
 with open('dockerfile.csv', 'w', newline='') as csvfile:
+    csvfile.write(codecs.BOM_UTF8)
     spamwriter = csv.writer(csvfile)
     for row in dockerteam_cursor.fetchall():
         spamwriter.writerow([row[0], row[1].replace('\0', ''), re.sub(maintainer_pattern, '', row[2].replace('\0', ''))])
