@@ -141,8 +141,8 @@ db_ip = "[ip]"
 test_db = pymysql.connect(db_ip,"dockerteam","docker","test", use_unicode=True, charset="utf8")
 test_cursor = test_db.cursor()
 
-count = 157940
-test_cursor.execute("SELECT url from test.images limit "+str(count)+",200000")
+count = 190584
+test_cursor.execute("SELECT url from test.images limit "+str(count)+",230000")
 
 for row in test_cursor.fetchall():
     count = count + 1
@@ -172,10 +172,6 @@ for row in test_cursor.fetchall():
 
             dockerteam_db.commit()
 
-            if reconnect_count == 10:
-                dockerteam_db.close()
-                reconnect_count = 0
-
             # if effect_row > 0:
             #     print("Inserted dockerfile into database")
             #     #print("dockerfile_content:",dockerfile_content)
@@ -195,7 +191,10 @@ for row in test_cursor.fetchall():
             #         sql = "INSERT INTO githubfile(dockerfile_uuid, copy_command, url, file_content) VALUES(\"%s\", \"%s\", \"%s\", \"%s\")" % (dockerfile_uuid, f_c_e.command, f_c_e.url, f_c_e.content)
             #         effect_row3 = dockerteam_cursor.execute(sql)
             #     dockerteam_db.commit()
-            #     dockerteam_db.close()
+
+            if reconnect_count == 10:
+                dockerteam_db.close()
+                reconnect_count = 0
 
         except pymysql.InternalError as e:
             print("pymysql.InternalError Exception:", e)
