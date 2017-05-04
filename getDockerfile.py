@@ -140,9 +140,11 @@ db_ip = "[ip]"
 
 test_db = pymysql.connect(db_ip,"dockerteam","docker","test", use_unicode=True, charset="utf8")
 test_cursor = test_db.cursor()
+dockerteam_db = pymysql.connect(db_ip, "dockerteam", "docker", "dockerteam", use_unicode=True, charset="utf8")
+dockerteam_cursor = dockerteam_db.cursor()
 
-count = 190584
-test_cursor.execute("SELECT url from test.images limit "+str(count)+",230000")
+count = 288888
+test_cursor.execute("SELECT url from test.images limit "+str(count)+", 200000")
 
 for row in test_cursor.fetchall():
     count = count + 1
@@ -156,7 +158,7 @@ for row in test_cursor.fetchall():
     #print(github_url)
 
     #每隔一定次数重连一次数据库
-    reconnect_count = 0
+    reconnect_count = 1
     if len(dockerfile_content) > 0:
         dockerfile_uuid = uuid.uuid1()
         try:
@@ -198,10 +200,8 @@ for row in test_cursor.fetchall():
 
         except pymysql.InternalError as e:
             print("pymysql.InternalError Exception:", e)
-            dockerteam_db.close()
         except Exception as e:
             print("Exception:", e)
-            dockerteam_db.close()
     else:
         print("no dockerfile content, ignore")
 
